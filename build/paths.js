@@ -7,7 +7,7 @@ const paths = {};
 paths.dest = path.resolve(process.cwd(), "server");
 
 /** The src directory */
-paths.src = path.resolve(process.cwd(), "../all/src");
+paths.src = path.resolve(process.cwd(), "../src");
 
 /**
  * Converts a path based on src directory to path relative to project
