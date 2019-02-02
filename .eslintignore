@@ -1,0 +1,5 @@
+node_modules/**/*
+server/**/*
+src/**/*.min.js
+src/public_html/scripts/c2runtime.js
+src/public_html/scripts/require.js

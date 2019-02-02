@@ -1,0 +1,12 @@
+node_modules
+GTEMP.pas
+GPATH
+GRTAGS
+GTAGS
+data/ftp.json
+data/local_mtimes.json
+server
+src/public_html/databases/*.json
+src/public_html/databases/server.log
+.tmp.drivedownload
+.sync
