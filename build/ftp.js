@@ -5,12 +5,10 @@ const fs = require("fs-extra");
 const ftp = require("basic-ftp");
 const genericPool = require("generic-pool");
 const path = require("path");
+const paths = require("./paths");
 const centralizedLog = require("./log");
 
 const ftpConfig = fs.readJSONSync("data/ftp.json");
-
-// package.json -> config -> dest
-const dest = process.env.npm_package_config_dest;
 
 // The export object
 const ftpModule = {};
@@ -143,7 +141,7 @@ ftpModule.toRemotePath = function (p) {
 ftpModule.upload = async function (p) {
 	const remoteP = ftpModule.toRemotePath(p);
 	const client = await ftpPool.acquire();
-	const rStream = fs.createReadStream(path.join(dest, p));
+	const rStream = fs.createReadStream(paths.toDest(p));
 	try {
 		const exist = await client.checkExists(p);
 		await client.upload(rStream, remoteP);

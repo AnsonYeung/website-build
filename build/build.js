@@ -13,7 +13,7 @@
  */
 
 const fs = require("fs-extra");
-const path = require("path");
+const paths = require("./paths");
 const babel = require("@babel/core");
 const html = require("html-minifier");
 const CleanCSS = require("clean-css");
@@ -28,11 +28,6 @@ const css = new CleanCSS({
 
 // The export object on this file
 const build = {};
-
-// package.json -> config -> dest
-// This directory holds all the minified resources.
-// Note that files that will be changed on the server will not present.
-build.dest = process.env.npm_package_config_dest;
 
 /**
  * @param {string} p path based on src directory
@@ -49,39 +44,39 @@ build.pathToDest = function (p) {
  * @type {Builder}
  */
 build.scripts = async function (p) {
-	const result = await babel.transformFileAsync(path.join("src", p));
-	await fs.writeFile(path.join(build.dest, p), result.code);
+	const result = await babel.transformFileAsync(paths.toSrc(p));
+	await fs.writeFile(paths.toDest(p), result.code);
 };
 
 /**
  * @type {Builder}
  */
 build.jsx = async function (p) {
-	const result = await babel.transformFileAsync(path.join("src", p), {presets: ["@babel/react"]});
-	await fs.writeFile(path.join(build.dest, build.pathToDest(p)), result.code);
+	const result = await babel.transformFileAsync(paths.toSrc(p), {presets: ["@babel/react"]});
+	await fs.writeFile(paths.toDest(build.pathToDest(p)), result.code);
 };
 
 /**
  * @type {Builder}
  */
 build.styles = async function (p) {
-	const result = await css.minify(await fs.readFile(path.join("src", p)));
-	await fs.writeFile(path.join(build.dest, p), result.styles);
+	const result = await css.minify(await fs.readFile(paths.toSrc(p)));
+	await fs.writeFile(paths.toDest(p), result.styles);
 };
 
 /**
  * @type {Builder}
  */
 build.html = async function (p) {
-	const result = html.minify((await fs.readFile(path.join("src", p))).toString());
-	await fs.writeFile(path.join(build.dest, p), result);
+	const result = html.minify((await fs.readFile(paths.toSrc(p))).toString());
+	await fs.writeFile(paths.toDest(p), result);
 };
 
 /**
  * @type {Builder}
  */
 build.assets = async function (p) {
-	await fs.copy(path.join("src", p), path.join(build.dest, p));
+	await fs.copy(paths.toSrc(p), paths.toDest(p));
 };
 
 /**

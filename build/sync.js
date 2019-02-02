@@ -10,6 +10,7 @@
  */
 const fs = require("fs-extra");
 const path = require("path");
+const paths = require("./paths");
 const minimatch = require("minimatch");
 const pify = require("pify");
 const glob = pify(require("glob"));
@@ -97,7 +98,7 @@ sync.push = async function (p) {
 		throw new Error("It's not a sync file! (" + p + ")");
 	}
 	const client = await ftp.pool.acquire();
-	await client.upload(fs.createReadStream(path.join("src", p)), remoteP);
+	await client.upload(fs.createReadStream(paths.toSrc(p)), remoteP);
 	await client.send("SITE CHMOD 666 " + remoteP);
 	mtimes[p] = +await client.lastMod(p);
 	await ftp.pool.release(client);
@@ -124,7 +125,7 @@ sync.pullOne = async function (p) {
 			const tmpFile = path.join(".sync", p);
 			await fs.ensureDir(path.dirname(tmpFile));
 			await client.download(fs.createWriteStream(tmpFile), remoteP);
-			fs.move(tmpFile, path.join("src", p), {overwrite: true});
+			fs.move(tmpFile, paths.toSrc(p), {overwrite: true});
 			mtimes[p] = +await client.lastMod(remoteP);
 			centralizedLog("Pulled database " + p);
 		}
