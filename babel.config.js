@@ -1,11 +1,8 @@
 module.exports = {
 	"presets": [
-		[
-			"@babel/preset-env",
-			{
-				"useBuiltIns": "usage"
-			}
-		],
 		"minify"
+	],
+	"plugins": [
+		"@babel/plugin-syntax-dynamic-import"
 	]
 };
