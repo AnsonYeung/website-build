@@ -1,10 +1,10 @@
-const path = require("path");
+const paths = require("./paths");
 
 /**
  * @type {import("minimatch").IOptions}
  */
 module.exports = {
-	cwd: path.join(process.cwd(), "src"),
+	cwd: paths.src,
 	nosort: true,
 	nodir: true,
 	dot: true

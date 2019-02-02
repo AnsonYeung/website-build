@@ -5,7 +5,7 @@
  * All files except those in `data\.sync` will be recorded
  */
 const fs = require("fs-extra");
-const path = require("path");
+const paths = require("./paths");
 const chokidar = require("chokidar");
 const centralizedLog = require("./log");
 const sync = require("./sync");
@@ -71,7 +71,7 @@ const onChange = function (event, p) {
 		case "add":
 		case "change":
 			{
-				const mtime = (await fs.stat(path.join("src", p))).mtimeMs;
+				const mtime = (await fs.stat(paths.toSrc(p))).mtimeMs;
 				if (!mtimes[p] || mtimes[p] < mtime) {
 					if (await sync.containsPath(p)) {
 						await sync.push(p);
@@ -98,7 +98,7 @@ const onChange = function (event, p) {
 				const strs = eventFuncTable[event];
 				await Promise.all([
 					ftpSend(strs[0], ftp.toRemotePath(p)),
-					fs[strs[1]](path.join(build.dest, p))
+					fs[strs[1]](paths.toDest(p))
 				]);
 				if (event === "unlink") {
 					delete mtimes[p];
@@ -125,12 +125,14 @@ const onChange = function (event, p) {
 
 /**
  * Start watching for file changes
- * @param {(...args)=>void} onReady
+ * @param {()=>void} onReady
  */
 const watch = function (onReady) {
 	centralizedLog(">>> Building the source code");
+	/** @type {import("chokidar").WatchOptions}*/
 	const options = {
-		cwd: path.join(process.cwd(), "src")
+		cwd: paths.src,
+		ignored: [".git/**"]
 	};
 	chokidar.watch("./", options)
 		.on("all", onChange)

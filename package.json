@@ -18,9 +18,6 @@
 		"start": "node build",
 		"lint": "eslint **/*.js **/*.jsx"
 	},
-	"config": {
-		"dest": "server"
-	},
 	"dependencies": {
 		"@babel/core": "^7.2.2",
 		"@babel/polyfill": "^7.2.5",
