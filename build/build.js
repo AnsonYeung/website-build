@@ -22,7 +22,6 @@ const minimatch  = require("minimatch");
 const matchOptions = require("./matchOptions");
 const css = new CleanCSS({
 	/** Options that passes into clean-css */
-	// @ts-ignore
 	returnPromise: true
 });
 

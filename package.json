@@ -1,5 +1,5 @@
 {
-	"name": "ysh-homepage",
+	"name": "website-build",
 	"version": "1.0.0",
 	"private": true,
 	"homepage": "http://student.tanghin.edu.hk/~S151204/",
@@ -32,14 +32,16 @@
 		"glob": "^7.1.3",
 		"graceful-fs": "^4.1.15",
 		"html-minifier": "^3.5.21",
+		"jquery": "^3.3.1",
 		"minimatch": "^3.0.4",
 		"pify": "^4.0.1"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/AnsonYeung/YSH-homepage.git"
+		"url": "https://github.com/AnsonYeung/website-build.git"
 	},
 	"devDependencies": {
+		"@babel/cli": "^7.2.3",
 		"eslint": "^5.12.1",
 		"eslint-plugin-react": "^7.12.4"
 	}
