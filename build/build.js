@@ -67,7 +67,13 @@ build.styles = async function (p) {
  * @type {Builder}
  */
 build.html = async function (p) {
-	const result = html.minify((await fs.readFile(paths.toSrc(p))).toString());
+	const result = html.minify((await fs.readFile(paths.toSrc(p))).toString(), {
+		collapseInlineTagWhitespace: true,
+		collapseWhitespace: true,
+		minifyCSS: true,
+		minifyJS: true,
+		removeComments: true,
+	});
 	await fs.writeFile(paths.toDest(p), result);
 };
 
