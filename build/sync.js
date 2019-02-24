@@ -93,7 +93,7 @@ sync.push = async function (p) {
 	if (sync.push.pushing[p]) return;
 	sync.push.pushing[p] = true;
 	await load;
-	const remoteP = ftp.toRemotePath(p);
+	const remoteP = paths.toRemotePath(p);
 	if (!sync.containsPath(p)) {
 		throw new Error("It's not a sync file! (" + p + ")");
 	}
@@ -118,7 +118,7 @@ sync.push.pushing = {};
  * @param {string} p path based on src directory
  */
 sync.pullOne = async function (p) {
-	const remoteP = ftp.toRemotePath(p);
+	const remoteP = paths.toRemotePath(p);
 	const client = await ftp.pool.acquire();
 	try {
 		if ((await client.lastMod(remoteP)).valueOf() > mtimes[p]) {

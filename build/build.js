@@ -68,10 +68,14 @@ build.styles = async function (p) {
  */
 build.html = async function (p) {
 	const result = html.minify((await fs.readFile(paths.toSrc(p))).toString(), {
+		collapseBooleanAttributes: true,
 		collapseInlineTagWhitespace: true,
 		collapseWhitespace: true,
+		conservativeCollapse: true,
+		decodeEntities: true,
 		minifyCSS: true,
-		minifyJS: true,
+		minifyJS: text => babel.transform(text).code,
+		processConditionalComments: true,
 		removeComments: true,
 	});
 	await fs.writeFile(paths.toDest(p), result);
@@ -94,7 +98,7 @@ build.auto = async function (p) {
 	// special handling for sync files
 	if (await sync.containsPath(p)) throw new Error("Builder doesn't exist for file " + p);
 
-	if (p === "public_html\\scripts\\c2runtime.js" || p === "public_html\\scripts\\require.js") {
+	if (paths.toRemotePath(p) === "/public_html/scripts/c2runtime.js") {
 		// Special handling
 		await build.assets(p);
 		return;
@@ -106,7 +110,7 @@ build.auto = async function (p) {
 		await build.scripts(p);
 	} else if (minimatch(p, "**/*.css", matchOptions)) {
 		await build.styles(p);
-	} else if (minimatch(p, "**/*.html", matchOptions) || minimatch(p, "**/*.php", matchOptions)) {
+	} else if (minimatch(p, "**/*.php", matchOptions)) {
 		await build.html(p);
 	} else {
 		await build.assets(p);

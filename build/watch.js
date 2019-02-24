@@ -97,7 +97,7 @@ const onChange = function (event, p) {
 			{
 				const strs = eventFuncTable[event];
 				await Promise.all([
-					ftpSend(strs[0], ftp.toRemotePath(p)),
+					ftpSend(strs[0], paths.toRemotePath(p)),
 					fs[strs[1]](paths.toDest(p))
 				]);
 				if (event === "unlink") {

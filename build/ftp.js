@@ -41,7 +41,7 @@ class MyClient extends ftp.Client {
 	 */
 	async lastMod(p) {
 		try {
-			const remoteP = ftpModule.toRemotePath(p);
+			const remoteP = paths.toRemotePath(p);
 			const mtime = await super.lastMod(remoteP);
 			// Due to the misconfiguation of the server, the time needs to be adjusted
 			return new Date(mtime.valueOf() - 8 * 60 * 60 * 1000);
@@ -63,7 +63,7 @@ class MyClient extends ftp.Client {
 	 */
 	async checkExists(p) {
 		try {
-			const remoteP = ftpModule.toRemotePath(p);
+			const remoteP = paths.toRemotePath(p);
 			await this.cd(path.posix.dirname(remoteP));
 			const fileList = await this.list();
 			for (const fileInfo of fileList) {
@@ -123,23 +123,13 @@ ftpModule.debug = false;
 ftpModule.pool = ftpPool;
 
 /**
- * Converts a path to remote path
- * 
- * @param {string} p path based on src directory
- * @returns {string} remote path
- */
-ftpModule.toRemotePath = function (p) {
-	return path.posix.join("/", p.split(path.sep).join(path.posix.sep));
-};
-
-/**
  * Upload a file from config -> dest to the server
  * 
  * @param {string} p path based on src directory
  * @returns {Promise<void>}
  */
 ftpModule.upload = async function (p) {
-	const remoteP = ftpModule.toRemotePath(p);
+	const remoteP = paths.toRemotePath(p);
 	const client = await ftpPool.acquire();
 	const rStream = fs.createReadStream(paths.toDest(p));
 	try {
