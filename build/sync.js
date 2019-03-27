@@ -156,14 +156,12 @@ sync.pull = function () {
 	for (const p in mtimes) {
 		pullList.push(sync.pullOne(p));
 	}
-	return Promise.all(pullList).then(() => {
+	return Promise.all(pullList).then(fs.remove(".sync")).then(() => {
+		sync.pull.running = false;
 		if (sync.pull.firstTime) {
 			centralizedLog("End first pulling");
 			sync.pull.firstTime = false;
 		}
-		return fs.rmdir(".sync").then(() => {
-			sync.pull.running = false;
-		});
 	});
 };
 
