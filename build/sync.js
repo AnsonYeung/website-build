@@ -133,7 +133,7 @@ sync.pullOne = async function (p) {
 		await client.download(fs.createWriteStream(tmpFile), remoteP);
 		fs.move(tmpFile, paths.toSrc(p), {overwrite: true});
 		mtimes[p] = newmtime;
-		centralizedLog("Pulled database " + p);
+		centralizedLog("\x1b[35mPulled database\x1b[0m " + p);
 	}
 	await ftp.pool.release(client);
 };
@@ -143,23 +143,22 @@ sync.pullOne = async function (p) {
  */
 sync.pull = function () {
 	// Check pulling
-	if (sync.pull.running) return;
+	if (sync.pull.running) return Promise.resolve();
 	// Check pushing
 	for (const s in sync.push.pushing) {
-		if (sync.push.pushing[s])
-			return;
+		if (sync.push.pushing[s]) return Promise.resolve();
 	}
 	sync.pull.running = true;
-	if (sync.pull.firstTime) centralizedLog("Begin first pulling");
+	if (sync.pull.firstTime) centralizedLog("\x1b[47m\x1b[30mBegin first pulling\x1b[0m");
 	/** @type {Promise<void>[]} */
 	const pullList = [];
 	for (const p in mtimes) {
 		pullList.push(sync.pullOne(p));
 	}
-	return Promise.all(pullList).then(fs.remove(".sync")).then(() => {
+	return Promise.all(pullList).then(() => fs.remove(".sync")).then(() => {
 		sync.pull.running = false;
 		if (sync.pull.firstTime) {
-			centralizedLog("End first pulling");
+			centralizedLog("\x1b[47m\x1b[30mEnd first pulling\x1b[0m");
 			sync.pull.firstTime = false;
 		}
 	});

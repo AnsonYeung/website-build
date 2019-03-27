@@ -23,6 +23,13 @@ const mtimesLoc = "data/local_mtimes.json";
  **/
 const mtimes = fs.readJSONSync(mtimesLoc);
 
+
+/**
+ * The variable to access the status of the file being built
+ * @type {Object<string, Promise<void> >}
+ **/
+const building = {};
+
 /**
  * Call a method on a ftp instance.
  * 
@@ -53,12 +60,12 @@ const eventFuncTable = {
 	"unlink": [
 		"remove",
 		"remove",
-		"Removed file "
+		"\x1b[31mRemoved file\x1b[0m "
 	],
 	"unlinkDir": [
 		"removeDir",
 		"remove",
-		"Removed directory "
+		"\x1b[31mRemoved directory\x1b[0m "
 	]
 };
 
@@ -71,38 +78,60 @@ const onChange = function (event, p) {
 		case "add":
 		case "change":
 			{
-				const mtime = (await fs.stat(paths.toSrc(p))).mtimeMs;
-				if (!mtimes[p] || mtimes[p] < mtime) {
-					if (await sync.containsPath(p)) {
-						await sync.push(p);
-						centralizedLog("Pushed database " + p);
-					} else {
-						if (event === "add") {
-							centralizedLog("Added " + p);
-						} else {
-							centralizedLog("Changed " + p);
-						}
-						await build.auto(p);
-						centralizedLog("Built " + p);
-						await ftp.upload(build.pathToDest(p));
-					}
-					mtimes[p] = mtime;
-					await fs.writeJSON(mtimesLoc, mtimes);
+				if (event === "add") {
+					centralizedLog("\x1b[32mAdd event:\x1b[0m " + p);
+				} else {
+					centralizedLog("\x1b[32mChange event:\x1b[0m " + p);
 				}
+				const prevProm = building[p] ? building[p] : Promise.resolve();
+				building[p] = prevProm.then(async () => {
+					const mtime = (await fs.stat(paths.toSrc(p))).mtimeMs;
+					if (!mtimes[p] || mtimes[p] < mtime) {
+						if (await sync.containsPath(p)) {
+							await sync.push(p);
+							centralizedLog("\x1b[35mPushed database\x1b[0m " + p);
+						} else {
+							await build.auto(p);
+							centralizedLog("Built " + p);
+							await ftp.upload(build.pathToDest(p));
+						}
+						mtimes[p] = mtime;
+						await fs.writeJSON(mtimesLoc, mtimes);
+					}
+				}).catch(e => {
+					throw e;
+				});
 			}
 			break;
-		case "addDir":
 		case "unlink":
+		case "addDir":
 		case "unlinkDir":
 			{
 				const strs = eventFuncTable[event];
-				await Promise.all([
-					ftpSend(strs[0], paths.toRemotePath(p)),
-					fs[strs[1]](paths.toDest(p))
-				]);
+				const start = () => {
+					return Promise.all([
+						ftpSend(strs[0], paths.toRemotePath(p)),
+						fs[strs[1]](paths.toDest(p))
+					]);
+				};
 				if (event === "unlink") {
-					delete mtimes[p];
-					await fs.writeJSON(mtimesLoc, mtimes);
+					let prevProm = building[p] ? building[p] : Promise.resolve();
+					const addToQueue = function () {
+						prevProm.then(async () => {
+							if (prevProm === building[p]) {
+								await start();
+								delete mtimes[p];
+								delete building[p];
+								await fs.writeJSON(mtimesLoc, mtimes);
+							} else {
+								prevProm = building[p];
+								addToQueue();
+							}
+						});
+					};
+					addToQueue();
+				} else {
+					await start();
 				}
 				if (event !== "addDir") {
 					// Only do it noisily when a file is deleted
@@ -126,7 +155,7 @@ const onChange = function (event, p) {
 
 /**
  * Start watching for file changes
- * @param {()=>void} onReady
+ * @param {()=>any} onReady
  */
 const watch = function (onReady) {
 	centralizedLog(">>> Building the source code");
