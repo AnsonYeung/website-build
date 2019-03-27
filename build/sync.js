@@ -29,7 +29,7 @@ const sync = {};
 const minimatchs = [];
 
 /**
- * An object holding the remote modification times of files.
+ * An object holding the remote modification times of sync files.
  * 
  * @type {Object<string, number>}
  */
@@ -85,53 +85,55 @@ sync.containsPath = async function (p) {
 };
 
 /**
- * Performs validation and push the file to the server.
+ * Performs validation and push the sync file to the server.
  * 
  * @param {string} p path based on src directory
  */
-sync.push = async function (p) {
-	if (sync.push.pushing[p]) return;
-	sync.push.pushing[p] = true;
-	await load;
-	const remoteP = paths.toRemotePath(p);
-	if (!sync.containsPath(p)) {
-		throw new Error("It's not a sync file! (" + p + ")");
-	}
-	const client = await ftp.pool.acquire();
-	await client.upload(fs.createReadStream(paths.toSrc(p)), remoteP);
-	await client.send("SITE CHMOD 666 " + remoteP);
-	mtimes[p] = +await client.lastMod(p);
-	await ftp.pool.release(client);
-	sync.push.pushing[p] = false;
+sync.push = function (p) {
+	const lastPush = sync.push.pushing[p] ? sync.push.pushing[p] : Promise.resolve();
+	const pushProm = lastPush.then(async () => {
+		const remoteP = paths.toRemotePath(p);
+		if (!sync.containsPath(p)) {
+			throw new Error("It's not a sync file! (" + p + ")");
+		}
+		const client = await ftp.pool.acquire();
+		await client.upload(fs.createReadStream(paths.toSrc(p)), remoteP);
+		await client.send("SITE CHMOD 666 " + remoteP);
+		mtimes[p] = +await client.lastMod(p);
+		await ftp.pool.release(client);
+		// After this function returns, another pushing might be fired.
+		// Therefore, checking is required to confirm that this is the last element in the queue.
+		if (pushProm === sync.push.pushing[p]) {
+			sync.push.pushing[p] = null;
+		}
+	});
+	sync.push.pushing[p] = pushProm;
+	return pushProm;
 };
 
 /**
- * Indicate whether a push is running
+ * Indicate the push running on each file
  * 
- * @type {Object<string, boolean>}
+ * @type {Object<string, Promise<void> >}
  **/
 sync.push.pushing = {};
 
 /**
- * Pull one updated database into src directory using atomic write
+ * Pull one updated database wihtout any checking into src directory using atomic write
  * 
  * @param {string} p path based on src directory
  */
 sync.pullOne = async function (p) {
 	const remoteP = paths.toRemotePath(p);
 	const client = await ftp.pool.acquire();
-	try {
-		if ((await client.lastMod(remoteP)).valueOf() > mtimes[p]) {
-			const tmpFile = path.join(".sync", p);
-			await fs.ensureDir(path.dirname(tmpFile));
-			await client.download(fs.createWriteStream(tmpFile), remoteP);
-			fs.move(tmpFile, paths.toSrc(p), {overwrite: true});
-			mtimes[p] = +await client.lastMod(remoteP);
-			centralizedLog("Pulled database " + p);
-		}
-	} catch (e) {
-		await ftp.pool.release(client);
-		throw e;
+	const newmtime = +await client.lastMod(remoteP);
+	if (newmtime > mtimes[p]) {
+		const tmpFile = path.join(".sync", p);
+		await fs.ensureDir(path.dirname(tmpFile));
+		await client.download(fs.createWriteStream(tmpFile), remoteP);
+		fs.move(tmpFile, paths.toSrc(p), {overwrite: true});
+		mtimes[p] = newmtime;
+		centralizedLog("Pulled database " + p);
 	}
 	await ftp.pool.release(client);
 };
@@ -148,20 +150,20 @@ sync.pull = function () {
 			return;
 	}
 	sync.pull.running = true;
-	if (sync.pull.firstTime) {
-		centralizedLog("Begin first pulling");
-	}
+	if (sync.pull.firstTime) centralizedLog("Begin first pulling");
 	/** @type {Promise<void>[]} */
 	const pullList = [];
 	for (const p in mtimes) {
 		pullList.push(sync.pullOne(p));
 	}
 	return Promise.all(pullList).then(() => {
-		sync.pull.running = false;
 		if (sync.pull.firstTime) {
 			centralizedLog("End first pulling");
 			sync.pull.firstTime = false;
 		}
+		return fs.rmdir(".sync").then(() => {
+			sync.pull.running = false;
+		});
 	});
 };
 
