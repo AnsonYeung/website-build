@@ -119,6 +119,7 @@ const onChange = function (event, p) {
 			centralizedLog("Error at " + p);
 			// eslint-disable-next-line no-console
 			console.dir(reason);
+			throw reason;
 		}
 	);
 };
@@ -136,7 +137,14 @@ const watch = function (onReady) {
 	};
 	chokidar.watch("./", options)
 		.on("all", onChange)
-		.on("ready", onReady);
+		.on("ready", function () {
+			const cb = onReady();
+			if (cb instanceof Promise) {
+				cb.catch(e => {
+					throw e;
+				});
+			}
+		});
 };
 
 module.exports = watch;

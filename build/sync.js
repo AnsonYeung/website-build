@@ -181,7 +181,11 @@ sync.setInterval = async function (interval) {
 	if (sync.setInterval.handle) {
 		throw new Error("There is already an interval running");
 	}
-	sync.setInterval.handle = setInterval(sync.pull, interval);
+	sync.setInterval.handle = setInterval(function () {
+		sync.pull().catch(e => {
+			throw e;
+		});
+	}, interval);
 };
 
 /** @type {NodeJS.Timeout} */
