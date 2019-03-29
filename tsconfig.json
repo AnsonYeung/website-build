@@ -5,7 +5,9 @@
 		"module": "commonjs",
 		"types": [
 			"node"
-		]
+		],
+		"noImplicitAny": true,
+		"strict": true
 	},
 	"include": [
 		"build/*"

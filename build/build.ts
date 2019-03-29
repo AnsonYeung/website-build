@@ -33,12 +33,20 @@ export function pathToDest(p: string): string {
 
 export const scripts: Builder = async function (p: string) {
 	const result = await babel.transformFileAsync(paths.toSrc(p));
-	await fs.writeFile(paths.toDest(p), result.code);
+	if (result) {
+		await fs.writeFile(paths.toDest(p), result.code);
+	} else {
+		throw new Error("\x1b[91mBuild failure at script " + p + "\x1b[0m");
+	}
 };
 
 export const jsx: Builder = async function (p: string) {
 	const result = await babel.transformFileAsync(paths.toSrc(p), {presets: ["@babel/react"]});
-	await fs.writeFile(paths.toDest(pathToDest(p)), result.code);
+	if (result) {
+		await fs.writeFile(paths.toDest(pathToDest(p)), result.code);
+	} else {
+		throw new Error("\x1b[91mBuild failure at jsx " + p + "\x1b[0m");
+	}
 };
 
 export const styles: Builder = async function (p: string) {
@@ -46,9 +54,6 @@ export const styles: Builder = async function (p: string) {
 	await fs.writeFile(paths.toDest(p), result.styles);
 };
 
-/**
- * @type {Builder}
- */
 export const html: Builder = async function (p: string) {
 	const result = htmlm.minify((await fs.readFile(paths.toSrc(p))).toString(), {
 		collapseBooleanAttributes: true,
@@ -57,7 +62,15 @@ export const html: Builder = async function (p: string) {
 		conservativeCollapse: true,
 		decodeEntities: true,
 		minifyCSS: true,
-		minifyJS: (text: string) => babel.transform(text).code,
+		minifyJS: (text: string) => {
+			const result = babel.transform(text);
+			const c = result ? result.code : null;
+			if (c) {
+				return c;
+			} else {
+				throw new Error("\x1b[91mBuild failure at html inline script " + p + "\x1b[0m");
+			}
+		},
 		processConditionalComments: true,
 		removeComments: true,
 	});

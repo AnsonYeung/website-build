@@ -8,6 +8,8 @@
 		"eslint:recommended",
 		"plugin:react/recommended"
 	],
+	"parser": "typescript-eslint-parser",
+	"plugins": ["typescript"],
 	"parserOptions": {
 		"ecmaVersion": 2018
 	},

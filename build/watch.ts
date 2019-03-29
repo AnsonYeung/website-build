@@ -32,7 +32,7 @@ const building: { [s: string]: Promise<void>; } = {};
  * Call a method on a ftp instance.
  */
 const ftpSend = async function (name: string, ...args: any[]) {
-	const client = await ftp.pool.acquire();
+	const client: any = await ftp.pool.acquire();
 	try {
 		await client[name](...args);
 	} catch (e) {
@@ -100,10 +100,11 @@ const onChange = function (event: string, p: string) {
 		case "unlinkDir":
 			{
 				const strs = eventFuncTable[event];
+				const nfs: (typeof fs & {[s: string]: any}) = fs;
 				const start = () => {
 					return Promise.all([
 						ftpSend(strs[0], paths.toRemotePath(p)),
-						fs[strs[1]](paths.toDest(p))
+						nfs[strs[1]](paths.toDest(p))
 					]);
 				};
 				if (event === "unlink") {

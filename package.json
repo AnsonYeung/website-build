@@ -13,7 +13,8 @@
 		"url": "http://student.tanghin.edu.hk/~S151204/"
 	},
 	"scripts": {
-		"start": "npm run build && node dist",
+		"qs": "node dist",
+		"start": "npm run build && npm run qs",
 		"lint": "eslint **/*.ts",
 		"build": "tsc"
 	},
@@ -44,7 +45,8 @@
 		"jquery": "^3.3.1",
 		"minimatch": "^3.0.4",
 		"pify": "^4.0.1",
-		"typescript": "^3.3.4000"
+		"typescript": "^3.3.4000",
+		"typescript-eslint-parser": "^22.0.0"
 	},
 	"repository": {
 		"type": "git",

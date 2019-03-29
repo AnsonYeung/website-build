@@ -38,7 +38,7 @@ const load: Promise<void> = (function () {
 	const reader = readLine.createInterface({
 		input: fs.createReadStream(syncFileP)
 	});
-	let globCount = 0, globCb: (() => void) = null;
+	let globCount = 0, globCb: (null | (() => void)) = null;
 	reader.on("line", function (globPattern: string) {
 		globCount++;
 		minimatchs.push(new minimatch.Minimatch(globPattern, matchOptions));
@@ -75,13 +75,14 @@ export async function containsPath(p: string): Promise<boolean> {
 /**
  * Indicate the push running on each file
  **/
-const pushing: { [s: string]: Promise<void>; } = {};
+const pushing: { [s: string]: (null | Promise<void>); } = {};
 
 /**
  * Performs validation and push the sync file to the server.
  */
 export function push(p: string) {
-	const lastPush = pushing[p] ? pushing[p] : Promise.resolve();
+	let cpush: null | Promise<void> = pushing[p];
+	const lastPush: Promise<void> = cpush ? cpush : Promise.resolve();
 	const pushProm = lastPush.then(async () => {
 		const remoteP = paths.toRemotePath(p);
 		if (!containsPath(p)) {
@@ -152,7 +153,7 @@ export async function pull() {
 	}
 };
 
-let intHandle: NodeJS.Timeout = null;
+let intHandle: (null | NodeJS.Timeout) = null;
 
 /**
  * Set an interval to run pull
