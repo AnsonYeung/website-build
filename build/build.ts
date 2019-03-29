@@ -6,59 +6,42 @@
  * All functions involving path assumes the path to be correct.
  */
 
-/**
- * @callback Builder
- * @param {string} p path based on src directory
- * @returns {Promise<void>} resolve when done
- */
-
-const fs = require("fs-extra");
-const paths = require("./paths");
-const babel = require("@babel/core");
-const html = require("html-minifier");
-const CleanCSS = require("clean-css");
-const sync = require("./sync");
-const minimatch  = require("minimatch");
-const matchOptions = require("./matchOptions");
+import fs = require("fs-extra");
+import paths = require("./paths");
+import babel = require("@babel/core");
+import htmlm = require("html-minifier");
+import CleanCSS = require("clean-css");
+import sync = require("./sync");
+import minimatch = require("minimatch");
+import matchOptions = require("./matchOptions");
 const css = new CleanCSS({
 	/** Options that passes into clean-css */
 	returnPromise: true
 });
 
-// The export object on this file
-const build = {};
+interface Builder { (p: string): Promise<void> }
 
 /**
- * @param {string} p path based on src directory
- * @returns {string} modified path in config -> dest directory
+ * Returns the modified path in config -> dest directory
  */
-build.pathToDest = function (p) {
+export function pathToDest(p: string): string {
 	if (p.substr(-4, 4) === ".jsx") {
 		p = p.slice(0, -1);
 	}
 	return p;
 };
 
-/**
- * @type {Builder}
- */
-build.scripts = async function (p) {
+export const scripts: Builder = async function (p: string) {
 	const result = await babel.transformFileAsync(paths.toSrc(p));
 	await fs.writeFile(paths.toDest(p), result.code);
 };
 
-/**
- * @type {Builder}
- */
-build.jsx = async function (p) {
+export const jsx: Builder = async function (p: string) {
 	const result = await babel.transformFileAsync(paths.toSrc(p), {presets: ["@babel/react"]});
-	await fs.writeFile(paths.toDest(build.pathToDest(p)), result.code);
+	await fs.writeFile(paths.toDest(pathToDest(p)), result.code);
 };
 
-/**
- * @type {Builder}
- */
-build.styles = async function (p) {
+export const styles: Builder = async function (p: string) {
 	const result = await css.minify(await fs.readFile(paths.toSrc(p)));
 	await fs.writeFile(paths.toDest(p), result.styles);
 };
@@ -66,56 +49,48 @@ build.styles = async function (p) {
 /**
  * @type {Builder}
  */
-build.html = async function (p) {
-	const result = html.minify((await fs.readFile(paths.toSrc(p))).toString(), {
+export const html: Builder = async function (p: string) {
+	const result = htmlm.minify((await fs.readFile(paths.toSrc(p))).toString(), {
 		collapseBooleanAttributes: true,
 		collapseInlineTagWhitespace: true,
 		collapseWhitespace: true,
 		conservativeCollapse: true,
 		decodeEntities: true,
 		minifyCSS: true,
-		minifyJS: text => babel.transform(text).code,
+		minifyJS: (text: string) => babel.transform(text).code,
 		processConditionalComments: true,
 		removeComments: true,
 	});
 	await fs.writeFile(paths.toDest(p), result);
 };
 
-/**
- * @type {Builder}
- */
-build.assets = async function (p) {
+export const assets: Builder = async function (p: string) {
 	await fs.copy(paths.toSrc(p), paths.toDest(p));
 };
 
 /**
  * Call the builder for the specified file.
- * 
- * @param {string} p path based on src directory
- * @returns {Promise<void>}
  */
-build.auto = async function (p) {
+export const auto: Builder = async function (p: string) {
 	// special handling for sync files
 	if (await sync.containsPath(p)) throw new Error("Builder doesn't exist for file " + p);
 
 	if (paths.toRemotePath(p) === "/public_html/scripts/c2runtime.js") {
 		// Special handling
-		await build.assets(p);
+		await assets(p);
 		return;
 	}
 
 	if (minimatch(p, "**/*.jsx", matchOptions)) {
-		await build.jsx(p);
+		await jsx(p);
 	} else if (minimatch(p, "**/*.js", matchOptions)) {
-		await build.scripts(p);
+		await scripts(p);
 	} else if (minimatch(p, "**/*.css", matchOptions)) {
-		await build.styles(p);
+		await styles(p);
 	} else if (minimatch(p, "**/*.php", matchOptions)) {
-		await build.html(p);
+		await html(p);
 	} else {
-		await build.assets(p);
+		await assets(p);
 	}
 
 };
-
-module.exports = build;

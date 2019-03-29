@@ -1,9 +1,0 @@
-{
-	// VS Code `tsconfig.json` descendant
-	"compilerOptions": {
-		"target": "es2018"
-	},
-	"exclude": [
-		"node_modules"
-	]
-}

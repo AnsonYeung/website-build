@@ -1,17 +1,14 @@
 /**
  * This file provides an pool and modifications for FTP
  */
-const fs = require("fs-extra");
-const ftp = require("basic-ftp");
-const genericPool = require("generic-pool");
-const path = require("path");
-const paths = require("./paths");
-const centralizedLog = require("./log");
+import fs = require("fs-extra");
+import ftp = require("basic-ftp");
+import genericPool = require("generic-pool");
+import path = require("path");
+import paths = require("./paths");
+import centralizedLog = require("./log");
 
-const ftpConfig = fs.readJSONSync("data/ftp.json");
-
-// The export object
-const ftpModule = {};
+const ftpConfig: ftp.AccessOptions = fs.readJSONSync("data/ftp.json");
 
 /**
  * Same as the original `ftp.Client`, but modified to cope with problems with server.
@@ -19,10 +16,8 @@ const ftpModule = {};
 class MyClient extends ftp.Client {
 	/**
 	 * Recursively creates dir with 755 permission
-	 * 
-	 * @param {string} dir
 	 */
-	async ensureDirWithPerm(dir) {
+	async ensureDirWithPerm(dir: string) {
 		if (dir.startsWith("/"))
 			await this.cd("/");
 		const names = dir.split("/").filter(name => name !== "");
@@ -35,11 +30,8 @@ class MyClient extends ftp.Client {
 
 	/**
 	 * Get adjusted last modified time
-	 * 
-	 * @param {string} p path based on src directory
-	 * @returns {Promise<Date>}
 	 */
-	async lastMod(p) {
+	async lastMod(p: string): Promise<Date> {
 		try {
 			const remoteP = paths.toRemotePath(p);
 			const mtime = await super.lastMod(remoteP);
@@ -57,11 +49,8 @@ class MyClient extends ftp.Client {
 	/**
 	 * Check the existent of a remote file.
 	 * This function must not be collinear with transfer of the file
-	 * 
-	 * @param {string} p path based on src directory
-	 * @returns {Promise<boolean>}
 	 */
-	async checkExists(p) {
+	async checkExists(p: string): Promise<boolean> {
 		try {
 			const remoteP = paths.toRemotePath(p);
 			await this.cd(path.posix.dirname(remoteP));
@@ -83,13 +72,13 @@ class MyClient extends ftp.Client {
 	}
 }
 
-/**
- * @type {genericPool.Factory<MyClient>}
- */
-const ftpFactory = {
+/** Whether to log `basic-ftp` debug info */
+export let debug = false;
+
+const ftpFactory: genericPool.Factory<MyClient> = {
 	create: async function () {
 		let client = new MyClient();
-		if (exports.debug) {
+		if (debug) {
 			client.ftp.log = centralizedLog;
 		}
 		try {
@@ -107,7 +96,8 @@ const ftpFactory = {
 	validate: client => client.send("NOOP").then(() => true, () => false)
 };
 
-const ftpPool = genericPool.createPool(ftpFactory, {
+/** The FTP pool for public use */
+export const pool = genericPool.createPool(ftpFactory, {
 	min: 0,
 	max: 100,
 	testOnBorrow: true
@@ -116,21 +106,12 @@ const ftpPool = genericPool.createPool(ftpFactory, {
 // Indicate the start of FTP transfer
 centralizedLog("FTP Pool initialized");
 
-/** Whether to log `basic-ftp` debug info */
-ftpModule.debug = false;
-
-/** The FTP pool for public use */
-ftpModule.pool = ftpPool;
-
 /**
  * Upload a file from config -> dest to the server
- * 
- * @param {string} p path based on src directory
- * @returns {Promise<void>}
  */
-ftpModule.upload = async function (p) {
+export async function upload(p: string): Promise<void> {
 	const remoteP = paths.toRemotePath(p);
-	const client = await ftpPool.acquire();
+	const client = await pool.acquire();
 	const rStream = fs.createReadStream(paths.toDest(p));
 	try {
 		const exist = await client.checkExists(p);
@@ -150,11 +131,9 @@ ftpModule.upload = async function (p) {
 			await client.send("SITE CHMOD 644 " + remoteP);
 			centralizedLog("Created " + p + " and missing directories remotely");
 		} else {
-			await ftpPool.release(client);
+			await pool.release(client);
 			throw e;
 		}
 	}
-	await ftpPool.release(client);
+	await pool.release(client);
 };
-
-module.exports = ftpModule;

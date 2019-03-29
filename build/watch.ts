@@ -4,13 +4,13 @@
  * This file handles the `data\local_mtimes.json` to enable a faster startup speed.
  * All files except those in `data\.sync` will be recorded
  */
-const fs = require("fs-extra");
-const paths = require("./paths");
-const chokidar = require("chokidar");
-const centralizedLog = require("./log");
-const sync = require("./sync");
-const ftp = require("./ftp");
-const build = require("./build");
+import fs = require("fs-extra");
+import paths = require("./paths");
+import chokidar = require("chokidar");
+import centralizedLog = require("./log");
+import sync = require("./sync");
+import ftp = require("./ftp");
+import build = require("./build");
 
 /**
  * Location of `data\local_mtimes.json`
@@ -19,24 +19,19 @@ const mtimesLoc = "data/local_mtimes.json";
 
 /**
  * The temporarily variable to access `data\local_mtimes.json`
- * @type {Object<string, number>}
  **/
-const mtimes = fs.readJSONSync(mtimesLoc);
+const mtimes: { [s: string]: number; } = fs.readJSONSync(mtimesLoc);
 
 
 /**
  * The variable to access the status of the file being built
- * @type {Object<string, Promise<void> >}
  **/
-const building = {};
+const building: { [s: string]: Promise<void>; } = {};
 
 /**
  * Call a method on a ftp instance.
- * 
- * @param {string} name the method to call
- * @param {...any} args
  */
-const ftpSend = async function (name, ...args) {
+const ftpSend = async function (name: string, ...args: any[]) {
 	const client = await ftp.pool.acquire();
 	try {
 		await client[name](...args);
@@ -48,10 +43,7 @@ const ftpSend = async function (name, ...args) {
 	await ftp.pool.release(client);
 };
 
-/**
- * @type {Object<string, string[]>}
- */
-const eventFuncTable = {
+const eventFuncTable: { [s: string]: string[]; } = {
 	"addDir": [
 		"ensureDir",
 		"ensureDir",
@@ -72,7 +64,7 @@ const eventFuncTable = {
 /**
  * Fired when a file is changed in src directory
  */
-const onChange = function (event, p) {
+const onChange = function (event: string, p: string) {
 	(async () => {
 		switch (event) {
 		case "add":
@@ -155,12 +147,10 @@ const onChange = function (event, p) {
 
 /**
  * Start watching for file changes
- * @param {()=>any} onReady
  */
-const watch = function (onReady) {
+export = function (onReady: () => any) {
 	centralizedLog(">>> Building the source code");
-	/** @type {import("chokidar").WatchOptions}*/
-	const options = {
+	const options: chokidar.WatchOptions = {
 		cwd: paths.src,
 		ignored: [".git/**"]
 	};
@@ -175,5 +165,3 @@ const watch = function (onReady) {
 			}
 		});
 };
-
-module.exports = watch;

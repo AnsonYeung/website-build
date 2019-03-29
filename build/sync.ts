@@ -8,49 +8,41 @@
  * Therefore, files present in `data/.sync` must be present in 
  * the `.gitignore` file.
  */
-const fs = require("fs-extra");
-const path = require("path");
-const paths = require("./paths");
-const minimatch = require("minimatch");
-const pify = require("pify");
+import fs = require("fs-extra");
+import path = require("path");
+import paths = require("./paths");
+import minimatch = require("minimatch");
+import ftp = require("./ftp");
+import matchOptions = require("./matchOptions");
+import centralizedLog = require("./log");
+import pify = require("pify");
 const glob = pify(require("glob"));
-const ftp = require("./ftp");
-const matchOptions = require("./matchOptions");
-const centralizedLog = require("./log");
-
-// The export object of this file
-const sync = {};
 
 /**
  * An array of Minimatch objects
- * 
- * @type {import("minimatch").IMinimatch[]}
  */
-const minimatchs = [];
+const minimatchs: minimatch.IMinimatch[] = [];
 
 /**
  * An object holding the remote modification times of sync files.
- * 
- * @type {Object<string, number>}
  */
-const mtimes = {};
+const mtimes: { [s: string]: number; } = {};
 
 /**
  * Initialize the `matches` Minimatch array synchronously.
  * Let node.js collect the memory after use.
- * @type {Promise<void>}
  */
-const load = (function () {
+const load: Promise<void> = (function () {
 	const readLine = require("readline");
 	const syncFileP = "data/.sync";
 	const reader = readLine.createInterface({
 		input: fs.createReadStream(syncFileP)
 	});
-	let globCount = 0, globCb = null;
-	reader.on("line", function (globPattern) {
+	let globCount = 0, globCb: (() => void) = null;
+	reader.on("line", function (globPattern: string) {
 		globCount++;
 		minimatchs.push(new minimatch.Minimatch(globPattern, matchOptions));
-		glob(globPattern, matchOptions).then(paths => {
+		glob(globPattern, matchOptions).then((paths: string[]) => {
 			globCount--;
 			paths.forEach(p => {
 				mtimes[p.split(path.posix.sep).join(path.sep)] = 0;
@@ -61,7 +53,7 @@ const load = (function () {
 			}
 		});
 	});
-	return new Promise(resolve => {
+	return new Promise<void>(resolve => {
 		reader.on("close", () => {
 			if (globCount === 0) {
 				resolve();
@@ -72,11 +64,7 @@ const load = (function () {
 	});
 })();
 
-/**
- * @param {string} p path based on src directory
- * @returns {Promise<boolean>}
- */
-sync.containsPath = async function (p) {
+export async function containsPath(p: string): Promise<boolean> {
 	await load;
 	for (const minimatchObj of minimatchs) {
 		if (minimatchObj.match(p)) return true;
@@ -85,15 +73,18 @@ sync.containsPath = async function (p) {
 };
 
 /**
+ * Indicate the push running on each file
+ **/
+const pushing: { [s: string]: Promise<void>; } = {};
+
+/**
  * Performs validation and push the sync file to the server.
- * 
- * @param {string} p path based on src directory
  */
-sync.push = function (p) {
-	const lastPush = sync.push.pushing[p] ? sync.push.pushing[p] : Promise.resolve();
+export function push(p: string) {
+	const lastPush = pushing[p] ? pushing[p] : Promise.resolve();
 	const pushProm = lastPush.then(async () => {
 		const remoteP = paths.toRemotePath(p);
-		if (!sync.containsPath(p)) {
+		if (!containsPath(p)) {
 			throw new Error("It's not a sync file! (" + p + ")");
 		}
 		const client = await ftp.pool.acquire();
@@ -103,27 +94,18 @@ sync.push = function (p) {
 		await ftp.pool.release(client);
 		// After this function returns, another pushing might be fired.
 		// Therefore, checking is required to confirm that this is the last element in the queue.
-		if (pushProm === sync.push.pushing[p]) {
-			sync.push.pushing[p] = null;
+		if (pushProm === pushing[p]) {
+			pushing[p] = null;
 		}
 	});
-	sync.push.pushing[p] = pushProm;
+	pushing[p] = pushProm;
 	return pushProm;
 };
 
 /**
- * Indicate the push running on each file
- * 
- * @type {Object<string, Promise<void> >}
- **/
-sync.push.pushing = {};
-
-/**
  * Pull one updated database wihtout any checking into src directory using atomic write
- * 
- * @param {string} p path based on src directory
  */
-sync.pullOne = async function (p) {
+export async function pullOne(p: string) {
 	const remoteP = paths.toRemotePath(p);
 	const client = await ftp.pool.acquire();
 	const newmtime = +await client.lastMod(remoteP);
@@ -138,67 +120,62 @@ sync.pullOne = async function (p) {
 	await ftp.pool.release(client);
 };
 
+/** Indicate whether a pull is running already */
+let pullRunning = false;
+
+/** Indicate whether it is a first run */
+let pullFirstTime = true;
+
 /**
  * Pull all updated database into src directory
  */
-sync.pull = function () {
+export async function pull() {
 	// Check pulling
-	if (sync.pull.running) return Promise.resolve();
+	if (pullRunning) return Promise.resolve();
 	// Check pushing
-	for (const s in sync.push.pushing) {
-		if (sync.push.pushing[s]) return Promise.resolve();
+	for (const s in pushing) {
+		if (pushing[s]) return Promise.resolve();
 	}
-	sync.pull.running = true;
-	if (sync.pull.firstTime) centralizedLog("\x1b[47m\x1b[30mBegin first pulling\x1b[0m");
+	pullRunning = true;
+	if (pullFirstTime) centralizedLog("\x1b[47m\x1b[30mBegin first pulling\x1b[0m");
 	/** @type {Promise<void>[]} */
-	const pullList = [];
+	const pullList: Promise<void>[] = [];
 	for (const p in mtimes) {
-		pullList.push(sync.pullOne(p));
+		pullList.push(pullOne(p));
 	}
-	return Promise.all(pullList).then(() => fs.remove(".sync")).then(() => {
-		sync.pull.running = false;
-		if (sync.pull.firstTime) {
-			centralizedLog("\x1b[47m\x1b[30mEnd first pulling\x1b[0m");
-			sync.pull.firstTime = false;
-		}
-	});
+	await Promise.all(pullList);
+	await fs.remove(".sync");
+	pullRunning = false;
+	if (pullFirstTime) {
+		centralizedLog("\x1b[47m\x1b[30mEnd first pulling\x1b[0m");
+		pullFirstTime = false;
+	}
 };
 
-/** Indicate whether a pull is running already */
-sync.pull.running = false;
-
-/** Indicate whether it is a first run */
-sync.pull.firstTime = true;
+let intHandle: NodeJS.Timeout = null;
 
 /**
- * Set an interval to run sync.pull
- * 
- * @param {number} interval
+ * Set an interval to run pull
  */
-sync.setInterval = async function (interval) {
+export async function setInterval(interval: number) {
 	await load;
-	if (sync.setInterval.handle) {
+	if (intHandle) {
 		throw new Error("There is already an interval running");
 	}
-	sync.setInterval.handle = setInterval(function () {
-		sync.pull().catch(e => {
+	intHandle = global.setInterval(function () {
+		pull().catch(e => {
 			throw e;
 		});
 	}, interval);
 };
 
-/** @type {NodeJS.Timeout} */
-sync.setInterval.handle = null;
-
 /**
  * Clears an interval previously set
  */
-sync.clearInterval = function () {
-	if (!sync.setInterval.handle) {
+export function clearInterval() {
+	if (!intHandle) {
 		throw new Error("There is currently no interval");
 	}
-	clearInterval(sync.setInterval.handle);
-	sync.setInterval.handle = null;
+	global.clearInterval(intHandle);
+	intHandle = null;
 };
-
-module.exports = sync;

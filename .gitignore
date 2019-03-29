@@ -11,3 +11,4 @@ src/public_html/databases/server.log
 .tmp.drivedownload
 .sync
 !data/.sync
+dist/
