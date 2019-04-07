@@ -32,20 +32,24 @@ export function pathToDest(p: string): string {
 };
 
 export const scripts: Builder = async function (p: string) {
-	const result = await babel.transformFileAsync(paths.toSrc(p));
+	const result = await babel.transformFileAsync(paths.toSrc(p)).catch(e => {
+		throw new Error("\x1b[91mBuild failure\x1b[0m at script " + p + "\n" + e);
+	});
 	if (result) {
 		await fs.writeFile(paths.toDest(p), result.code);
 	} else {
-		throw new Error("\x1b[91mBuild failure at script " + p + "\x1b[0m");
+		await fs.writeFile(paths.toDest(p), "");
 	}
 };
 
 export const jsx: Builder = async function (p: string) {
-	const result = await babel.transformFileAsync(paths.toSrc(p), {presets: ["@babel/react"]});
+	const result = await babel.transformFileAsync(paths.toSrc(p), {presets: ["@babel/react"]}).catch(e => {
+		throw new Error("\x1b[91mBuild failure\x1b[0m at jsx " + p + "\n" + e);
+	});
 	if (result) {
 		await fs.writeFile(paths.toDest(pathToDest(p)), result.code);
 	} else {
-		throw new Error("\x1b[91mBuild failure at jsx " + p + "\x1b[0m");
+		await fs.writeFile(paths.toDest(pathToDest(p)), "");
 	}
 };
 
@@ -63,12 +67,12 @@ export const html: Builder = async function (p: string) {
 		decodeEntities: true,
 		minifyCSS: true,
 		minifyJS: (text: string) => {
-			const result = babel.transform(text);
+			const result = babel.transformSync(text);
 			const c = result ? result.code : null;
 			if (c) {
 				return c;
 			} else {
-				throw new Error("\x1b[91mBuild failure at html inline script " + p + "\x1b[0m");
+				return "";
 			}
 		},
 		processConditionalComments: true,

@@ -91,7 +91,7 @@ const onChange = function (event: string, p: string) {
 						await fs.writeJSON(mtimesLoc, mtimes);
 					}
 				}).catch(e => {
-					throw e;
+					centralizedLog("\x1b[91mError\x1b[0m at " + p + "\n" + e);
 				});
 			}
 			break;
@@ -111,11 +111,11 @@ const onChange = function (event: string, p: string) {
 					let prevProm = building[p] ? building[p] : Promise.resolve();
 					const addToQueue = function () {
 						prevProm.then(async () => {
-							if (prevProm === building[p]) {
-								await start();
+							if (!building[p] || prevProm === building[p]) {
 								delete mtimes[p];
 								delete building[p];
 								await fs.writeJSON(mtimesLoc, mtimes);
+								await start();
 							} else {
 								prevProm = building[p];
 								addToQueue();
