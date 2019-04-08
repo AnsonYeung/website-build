@@ -129,7 +129,7 @@ export async function upload(p: string): Promise<void> {
 			await client.ensureDirWithPerm(path.posix.dirname(remoteP));
 			await client.upload(rStream, remoteP);
 			await client.send("SITE CHMOD 644 " + remoteP);
-			centralizedLog("Created " + p + " and missing directories remotely");
+			centralizedLog("Created " + p + " (and missing directories) remotely");
 		} else {
 			await pool.release(client);
 			throw e;

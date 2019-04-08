@@ -101,34 +101,27 @@ const onChange = function (event: string, p: string) {
 			{
 				const strs = eventFuncTable[event];
 				const nfs: (typeof fs & {[s: string]: any}) = fs;
-				const start = () => {
-					return Promise.all([
-						ftpSend(strs[0], paths.toRemotePath(p)),
-						nfs[strs[1]](paths.toDest(p))
+				const start = async () => {
+					await Promise.all([
+						ftpSend(strs[0], paths.toRemotePath(build.pathToDest(p))),
+						nfs[strs[1]](paths.toDest(build.pathToDest(p)))
 					]);
+					if (event !== "addDir") {
+						// Only do it noisily when a file is deleted
+						centralizedLog(strs[2] + p);
+					}
 				};
 				if (event === "unlink") {
 					let prevProm = building[p] ? building[p] : Promise.resolve();
-					const addToQueue = function () {
-						prevProm.then(async () => {
-							if (!building[p] || prevProm === building[p]) {
-								delete mtimes[p];
-								delete building[p];
-								await fs.writeJSON(mtimesLoc, mtimes);
-								await start();
-							} else {
-								prevProm = building[p];
-								addToQueue();
-							}
-						});
-					};
-					addToQueue();
+					building[p] = prevProm.then(async () => {
+						await start();
+						delete mtimes[p];
+						await fs.writeJSON(mtimesLoc, mtimes);
+					}).catch(e => {
+						centralizedLog("\x1b[91mError\x1b[0m at removing " + p + "\n" + e);
+					});
 				} else {
 					await start();
-				}
-				if (event !== "addDir") {
-					// Only do it noisily when a file is deleted
-					centralizedLog(strs[2] + p);
 				}
 			}
 			break;
@@ -138,10 +131,7 @@ const onChange = function (event: string, p: string) {
 	})().catch(
 		// Catch all errors along the way
 		reason => {
-			centralizedLog("Error at " + p);
-			// eslint-disable-next-line no-console
-			console.dir(reason);
-			throw reason;
+			centralizedLog("\x1b[91mError\x1b[0m at \x1b[35m" + event + "\x1b[0m " + p + "\n" + reason);
 		}
 	);
 };
