@@ -14,6 +14,8 @@ import CleanCSS = require("clean-css");
 import sync = require("./sync");
 import minimatch = require("minimatch");
 import matchOptions = require("./matchOptions");
+
+const specialFiles: string[] = fs.readJSONSync("data/special_assets.json");
 const css = new CleanCSS({
 	/** Options that passes into clean-css */
 	returnPromise: true
@@ -92,8 +94,7 @@ export const auto: Builder = async function (p: string) {
 	// special handling for sync files
 	if (await sync.containsPath(p)) throw new Error("Builder doesn't exist for file " + p);
 
-	if (paths.toRemotePath(p) === "/public_html/scripts/c2runtime.js") {
-		// Special handling
+	if (specialFiles.includes(paths.toRemotePath(p))) {
 		await assets(p);
 		return;
 	}
